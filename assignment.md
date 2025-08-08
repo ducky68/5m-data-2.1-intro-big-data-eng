@@ -15,7 +15,14 @@ Question: From the `movies` collection, return the documents with the `plot` tha
 Answer:
 
 ```python
-
+for movie in movies.find({"plot": {"$regex": "^war", "$options": "i"}}) \
+                   .sort("released", pymongo.ASCENDING) \
+                   .limit(5):
+    print({
+        "title": movie.get("title"),
+        "plot": movie.get("plot"),
+        "released": movie.get("released")
+    })
 ```
 
 ### Question 2
@@ -25,7 +32,22 @@ Question: Group by `rated` and count the number of movies in each.
 Answer:
 
 ```python
+#Group by `rated` and count the number of movies in each
+pipeline = [
+    {
+        "$group": {
+            "_id": "$rated",
+            "count": {"$sum": 1}
+        }
+    }
+]
 
+# Execute the aggregation pipeline
+results = movies.aggregate(pipeline)
+
+# Print the results
+for result in results:
+    print(f"Rating: {result['_id']}, Count: {result['count']}")
 ```
 
 ### Question 3
@@ -35,7 +57,33 @@ Question: Count the number of movies with 3 comments or more.
 Answer:
 
 ```python
+# Count the number of movies with 3 comments or more (optimized pipeline)
+# Ensure index exists for fast lookup
+index_name = db.comments.create_index("movie_id")
 
+pipeline = [
+    {"$lookup": {
+        "from": "comments",
+        "let": {"movie_id": "$_id"},
+        "pipeline": [
+            { "$match": { "$expr": { "$eq": ["$movie_id", "$$movie_id"] } } }
+        ],
+        "as": "comments"
+    }},
+    {"$match": {
+        "$expr": {
+            "$gte": [{ "$size": "$comments" }, 3]
+        }
+    }},
+    {"$count": "num_movies"}
+]
+
+# Execute the aggregation pipeline
+results = movies.aggregate(pipeline)
+
+# Print the results
+for result in results:
+    print(f"Number of movies with 3 comments or more: {result['num_movies']}")
 ```
 
 ## Submission
